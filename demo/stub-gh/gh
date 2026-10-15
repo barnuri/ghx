@@ -1,0 +1,14 @@
+#!/bin/sh
+# Demo stand-in for gh: answers only what demo.tape runs, so the GIF needs no real logins.
+if [ "$1 $2" = "auth token" ]; then
+  while [ $# -gt 0 ]; do
+    if [ "$1" = "--user" ]; then echo "demo-token-$2"; exit 0; fi
+    shift
+  done
+fi
+if [ "$1 $2" = "api user" ]; then
+  echo "${GH_TOKEN#demo-token-}"
+  exit 0
+fi
+echo "stub gh: unsupported command: $*" >&2
+exit 1

@@ -1,0 +1,15 @@
+# ~/.config/ghx/config.yaml  (Windows: %APPDATA%\ghx\config.yaml)
+
+profiles:
+  work:
+    user: octo-work
+  personal:
+    user: octo-personal
+
+dirs:
+  ~/code/work: work
+  ~/code/personal: personal
+
+# default: personal
+# manage_gh: true
+# disable_updates: true
