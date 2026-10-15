@@ -8,6 +8,8 @@ import (
 	"github.com/barnuri/ghx/internal/config"
 )
 
+func noRemote(string) string { return "" }
+
 func newTree(t *testing.T) (string, config.Config) {
 	t.Helper()
 	root := t.TempDir()
@@ -46,7 +48,7 @@ func TestProfile(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Profile(cfg, filepath.Join(root, tc.cwd), "")
+			got := Profile(cfg, filepath.Join(root, tc.cwd), "", noRemote)
 			if got.ProfileName != tc.want {
 				t.Fatalf("got %q, want %q", got.ProfileName, tc.want)
 			}
@@ -56,7 +58,7 @@ func TestProfile(t *testing.T) {
 
 func TestProfileOverrideWins(t *testing.T) {
 	root, cfg := newTree(t)
-	got := Profile(cfg, filepath.Join(root, "work"), "personal")
+	got := Profile(cfg, filepath.Join(root, "work"), "personal", noRemote)
 	if got.ProfileName != "personal" || got.Profile.User != "me" || got.Source != overrideSource {
 		t.Fatalf("unexpected match %+v", got)
 	}
@@ -65,7 +67,7 @@ func TestProfileOverrideWins(t *testing.T) {
 func TestProfileDefault(t *testing.T) {
 	root, cfg := newTree(t)
 	cfg.Default = "personal"
-	if got := Profile(cfg, root, ""); got.ProfileName != "personal" || got.Source != defaultSource {
+	if got := Profile(cfg, root, "", noRemote); got.ProfileName != "personal" || got.Source != defaultSource {
 		t.Fatalf("unexpected match %+v", got)
 	}
 }
@@ -76,7 +78,7 @@ func TestRepoFileBeatsDirs(t *testing.T) {
 	if err := os.WriteFile(repoFile, []byte("# repo profile\n\npersonal\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got := Profile(cfg, filepath.Join(root, "work/api/src"), "")
+	got := Profile(cfg, filepath.Join(root, "work/api/src"), "", noRemote)
 	if got.ProfileName != "personal" || got.Source != canonical(repoFile) {
 		t.Fatalf("unexpected match %+v", got)
 	}
@@ -87,7 +89,7 @@ func TestRepoFileWithUnknownNameIsGhUser(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "workshop", RepoFileName), []byte("octocat\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got := Profile(cfg, filepath.Join(root, "workshop"), "")
+	got := Profile(cfg, filepath.Join(root, "workshop"), "", noRemote)
 	if got.Profile.User != "octocat" || got.Profile.HostOrDefault() != config.DefaultHost {
 		t.Fatalf("unexpected match %+v", got)
 	}
@@ -99,7 +101,7 @@ func TestSymlinkedCwdResolvesToTarget(t *testing.T) {
 	if err := os.Symlink(filepath.Join(root, "work/api"), link); err != nil {
 		t.Skip("symlinks unavailable:", err)
 	}
-	if got := Profile(cfg, link, ""); got.ProfileName != "work" {
+	if got := Profile(cfg, link, "", noRemote); got.ProfileName != "work" {
 		t.Fatalf("got %q, want work", got.ProfileName)
 	}
 }
@@ -115,7 +117,47 @@ func TestTildeDirExpands(t *testing.T) {
 		Profiles: map[string]config.Profile{"work": {User: "me-work"}},
 		Dirs:     map[string]string{"~/code/work": "work"},
 	}
-	if got := Profile(cfg, filepath.Join(home, "code/work/repo"), ""); got.ProfileName != "work" {
+	if got := Profile(cfg, filepath.Join(home, "code/work/repo"), "", noRemote); got.ProfileName != "work" {
+		t.Fatalf("got %q, want work", got.ProfileName)
+	}
+}
+
+func TestSSHHostBeatsDirs(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.SSHHosts = map[string]string{"gh-personal": "personal"}
+	remote := func(string) string { return "git@gh-personal:org/repo.git" }
+	got := Profile(cfg, filepath.Join(root, "work/api"), "", remote)
+	if got.ProfileName != "personal" || got.Source != sshHostSource+"gh-personal" {
+		t.Fatalf("unexpected match %+v", got)
+	}
+}
+
+func TestSSHHostUnmappedFallsBackToDirs(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.SSHHosts = map[string]string{"gh-personal": "personal"}
+	remote := func(string) string { return "git@github.com:org/repo.git" }
+	if got := Profile(cfg, filepath.Join(root, "work/api"), "", remote); got.ProfileName != "work" {
+		t.Fatalf("got %q, want work", got.ProfileName)
+	}
+}
+
+func TestSSHHostSkipsGitWhenUnconfigured(t *testing.T) {
+	root, cfg := newTree(t)
+	remote := func(string) string {
+		t.Fatal("remote lookup ran without ssh_hosts")
+		return ""
+	}
+	Profile(cfg, filepath.Join(root, "work"), "", remote)
+}
+
+func TestRepoFileBeatsSSHHost(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.SSHHosts = map[string]string{"gh-personal": "personal"}
+	if err := os.WriteFile(filepath.Join(root, "work", RepoFileName), []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	remote := func(string) string { return "git@gh-personal:org/repo.git" }
+	if got := Profile(cfg, filepath.Join(root, "work"), "", remote); got.ProfileName != "work" {
 		t.Fatalf("got %q, want work", got.ProfileName)
 	}
 }

@@ -15,21 +15,24 @@ profiles:
   personal: {user: me}
 dirs:
   ~/code/work: work
+ssh_hosts:
+  gh-work: work
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.ManageGh || cfg.Profiles["work"].HostOrDefault() != "github.example.com" || cfg.Profiles["personal"].HostOrDefault() != DefaultHost {
+	if !cfg.ManageGh || cfg.Profiles["work"].HostOrDefault() != "github.example.com" || cfg.Profiles["personal"].HostOrDefault() != DefaultHost || cfg.SSHHosts["gh-work"] != "work" {
 		t.Fatalf("unexpected config %+v", cfg)
 	}
 }
 
 func TestParseRejectsInvalid(t *testing.T) {
 	cases := map[string]string{
-		"missing user":            "profiles: {work: {host: x}}",
-		"unknown dir profile":     "profiles: {work: {user: a}}\ndirs: {~/x: nope}",
-		"unknown default profile": "profiles: {work: {user: a}}\ndefault: nope",
-		"bad yaml":                "profiles: [",
+		"missing user":             "profiles: {work: {host: x}}",
+		"unknown dir profile":      "profiles: {work: {user: a}}\ndirs: {~/x: nope}",
+		"unknown ssh host profile": "profiles: {work: {user: a}}\nssh_hosts: {gh1: nope}",
+		"unknown default profile":  "profiles: {work: {user: a}}\ndefault: nope",
+		"bad yaml":                 "profiles: [",
 	}
 	for name, content := range cases {
 		t.Run(name, func(t *testing.T) {

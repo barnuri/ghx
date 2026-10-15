@@ -80,6 +80,7 @@ Full example: [examples/config.yaml](examples/config.yaml).
 | `profiles.<name>.user` | gh login, as shown by `gh auth status` |
 | `profiles.<name>.host` | GitHub Enterprise host. Default: `github.com` |
 | `dirs` | folder -> profile. The deepest matching folder wins |
+| `ssh_hosts` | ssh host alias in the `origin` remote URL -> profile. See below |
 | `default` | profile for folders outside every `dirs` entry. Default: plain gh |
 | `manage_gh` | `true` makes ghx download gh and keep it updated. Default: use gh from `PATH` |
 | `disable_updates` | `true` stops the daily ghx update check |
@@ -96,13 +97,35 @@ echo .ghx >> .git/info/exclude   # or add it to .gitignore
 
 ghx uses the nearest `.ghx` in the current folder or any parent folder.
 
+### SSH host aliases: `ssh_hosts`
+
+If you keep one ssh key per account with host aliases in `~/.ssh/config`:
+
+```sshconfig
+Host gh-work
+    HostName github.com
+    IdentityFile ~/.ssh/work
+```
+
+and clone with `git clone git@gh-work:org/repo.git`, map the alias to a profile:
+
+```yaml
+ssh_hosts:
+  gh-work: work
+  gh-personal: personal
+```
+
+ghx reads the host from `git remote get-url origin` (scp-like `git@gh-work:org/repo` or
+`ssh://git@gh-work/org/repo`). It runs git only when `ssh_hosts` is set.
+
 ### Resolution order
 
 1. `GHX_PROFILE` environment variable
 2. Nearest `.ghx` file
-3. Deepest matching `dirs` entry
-4. `default`
-5. No match: plain gh, with your active gh account
+3. `ssh_hosts` entry for the `origin` remote's host
+4. Deepest matching `dirs` entry
+5. `default`
+6. No match: plain gh, with your active gh account
 
 ## Commands
 

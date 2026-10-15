@@ -59,7 +59,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	match := resolve.Profile(cfg, cwd, os.Getenv(profileOverrideEnv))
+	match := resolve.Profile(cfg, cwd, os.Getenv(profileOverrideEnv), resolve.GitOriginURL)
 	if len(args) > 0 && args[0] == metaCommand {
 		return runMeta(args[1:], match, ghPath, updater)
 	}

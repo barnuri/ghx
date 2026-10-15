@@ -10,6 +10,10 @@ dirs:
   ~/code/work: work
   ~/code/personal: personal
 
+ssh_hosts:
+  gh-work: work
+  gh-personal: personal
+
 # default: personal
 # manage_gh: true
 # disable_updates: true

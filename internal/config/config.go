@@ -14,6 +14,7 @@ type Config struct {
 	Default        string             `yaml:"default"`
 	Profiles       map[string]Profile `yaml:"profiles"`
 	Dirs           map[string]string  `yaml:"dirs"`
+	SSHHosts       map[string]string  `yaml:"ssh_hosts"`
 }
 
 // Load returns an empty Config when the file does not exist, so ghx acts as plain gh.
@@ -48,6 +49,11 @@ func (cfg Config) validate() error {
 	for dir, profileName := range cfg.Dirs {
 		if _, ok := cfg.Profiles[profileName]; !ok {
 			return fmt.Errorf("dir %q: unknown profile %q", dir, profileName)
+		}
+	}
+	for host, profileName := range cfg.SSHHosts {
+		if _, ok := cfg.Profiles[profileName]; !ok {
+			return fmt.Errorf("ssh host %q: unknown profile %q", host, profileName)
 		}
 	}
 	if _, ok := cfg.Profiles[cfg.Default]; cfg.Default != "" && !ok {

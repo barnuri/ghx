@@ -14,17 +14,22 @@ const (
 	RepoFileName   = ".ghx"
 	overrideSource = "GHX_PROFILE"
 	defaultSource  = "default"
+	sshHostSource  = "ssh host "
 )
 
 // Profile picks the profile for cwd in this order: GHX_PROFILE, the nearest .ghx file,
-// the deepest configured dir containing cwd, then default. No match means plain gh.
-func Profile(cfg config.Config, cwd string, override string) Match {
+// the ssh host of the origin remote, the deepest configured dir containing cwd, then default.
+// No match means plain gh.
+func Profile(cfg config.Config, cwd string, override string, remoteURL RemoteURL) Match {
 	if override != "" {
 		return named(cfg, override, overrideSource)
 	}
 	current := canonical(cwd)
 	if name, file := nearestRepoFile(current); name != "" {
 		return named(cfg, name, file)
+	}
+	if match := sshHost(cfg, current, remoteURL); match.Found() {
+		return match
 	}
 	if match := deepestDir(cfg, current); match.Found() {
 		return match
@@ -43,6 +48,19 @@ func named(cfg config.Config, name string, source string) Match {
 		profile = config.Profile{User: name}
 	}
 	return Match{ProfileName: name, Profile: profile, Source: source}
+}
+
+// sshHost runs git only when ssh_hosts is configured, so other setups never pay for it.
+func sshHost(cfg config.Config, current string, remoteURL RemoteURL) Match {
+	if len(cfg.SSHHosts) == 0 {
+		return Match{}
+	}
+	host := remoteHost(remoteURL(current))
+	profileName, ok := cfg.SSHHosts[host]
+	if !ok {
+		return Match{}
+	}
+	return named(cfg, profileName, sshHostSource+host)
 }
 
 func deepestDir(cfg config.Config, current string) Match {
