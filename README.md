@@ -110,6 +110,7 @@ ghx adds one command group, `gh ghx`. Everything else goes to gh.
 
 ```text
 gh ghx which     Show the profile, gh user and gh binary for the current folder
+gh ghx current   Print only the profile name (empty when none), for prompts and status lines
 gh ghx update    Update ghx now (and gh when manage_gh is true)
 gh ghx version   Show the ghx version
 ```

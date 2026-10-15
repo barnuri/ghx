@@ -24,6 +24,7 @@ const (
 
 Commands:
   which     Show the profile, gh user and gh binary for the current directory
+  current   Print only the profile name for the current directory (empty when none)
   update    Update ghx now (and gh when manage_gh is true)
   version   Show the ghx version
   help      Show this help
@@ -82,6 +83,10 @@ func runMeta(args []string, match resolve.Match, ghPath string, updater update.U
 	switch command {
 	case "which":
 		printWhich(match, ghPath)
+	case "current":
+		if match.Found() {
+			fmt.Println(match.ProfileName)
+		}
 	case "update":
 		return updater.Run(os.Stdout)
 	case "version":
