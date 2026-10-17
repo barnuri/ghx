@@ -15,6 +15,7 @@ type Config struct {
 	Profiles       map[string]Profile `yaml:"profiles"`
 	Dirs           map[string]string  `yaml:"dirs"`
 	SSHHosts       map[string]string  `yaml:"ssh_hosts"`
+	RemoteUser     bool               `yaml:"remote_user"`
 }
 
 // Load returns an empty Config when the file does not exist, so ghx acts as plain gh.

@@ -19,3 +19,22 @@ func TestRemoteHost(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteUser(t *testing.T) {
+	cases := []struct {
+		remote, wantUser, wantHost string
+	}{
+		{"https://vbrozik@github.com/vbrozik/cp-py-tools.git", "vbrozik", "github.com"},
+		{"http://me:secret@ghe.corp:8443/org/repo", "me", "ghe.corp"},
+		{"https://github.com/org/repo.git", "", ""},
+		{"ssh://git@github.com/org/repo.git", "", ""},
+		{"git@github.com:org/repo.git", "", ""},
+		{"", "", ""},
+	}
+	for _, tc := range cases {
+		user, host := remoteUser(tc.remote)
+		if user != tc.wantUser || host != tc.wantHost {
+			t.Errorf("remoteUser(%q) = %q, %q, want %q, %q", tc.remote, user, host, tc.wantUser, tc.wantHost)
+		}
+	}
+}

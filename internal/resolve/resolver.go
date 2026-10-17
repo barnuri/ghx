@@ -11,14 +11,15 @@ import (
 )
 
 const (
-	RepoFileName   = ".ghx"
-	overrideSource = "GHX_PROFILE"
-	defaultSource  = "default"
-	sshHostSource  = "ssh host "
+	RepoFileName     = ".ghx"
+	overrideSource   = "GHX_PROFILE"
+	defaultSource    = "default"
+	sshHostSource    = "ssh host "
+	remoteUserSource = "remote user "
 )
 
 // Profile picks the profile for cwd in this order: GHX_PROFILE, the nearest .ghx file,
-// the ssh host of the origin remote, the deepest configured dir containing cwd, then default.
+// the ssh host or https user of the origin remote, the deepest configured dir containing cwd, then default.
 // No match means plain gh.
 func Profile(cfg config.Config, cwd string, override string, remoteURL RemoteURL) Match {
 	if override != "" {
@@ -28,7 +29,7 @@ func Profile(cfg config.Config, cwd string, override string, remoteURL RemoteURL
 	if name, file := nearestRepoFile(current); name != "" {
 		return named(cfg, name, file)
 	}
-	if match := sshHost(cfg, current, remoteURL); match.Found() {
+	if match := fromOrigin(cfg, current, remoteURL); match.Found() {
 		return match
 	}
 	if match := deepestDir(cfg, current); match.Found() {
@@ -50,17 +51,47 @@ func named(cfg config.Config, name string, source string) Match {
 	return Match{ProfileName: name, Profile: profile, Source: source}
 }
 
-// sshHost runs git only when ssh_hosts is configured, so other setups never pay for it.
-func sshHost(cfg config.Config, current string, remoteURL RemoteURL) Match {
-	if len(cfg.SSHHosts) == 0 {
+// fromOrigin runs git only when ssh_hosts or remote_user is configured, so other setups never pay for it.
+func fromOrigin(cfg config.Config, current string, remoteURL RemoteURL) Match {
+	if len(cfg.SSHHosts) == 0 && !cfg.RemoteUser {
 		return Match{}
 	}
-	host := remoteHost(remoteURL(current))
+	remote := remoteURL(current)
+	if match := sshHost(cfg, remote); match.Found() {
+		return match
+	}
+	if cfg.RemoteUser {
+		return userInRemote(cfg, remote)
+	}
+	return Match{}
+}
+
+func sshHost(cfg config.Config, remote string) Match {
+	host := remoteHost(remote)
 	profileName, ok := cfg.SSHHosts[host]
 	if !ok {
 		return Match{}
 	}
 	return named(cfg, profileName, sshHostSource+host)
+}
+
+// userInRemote prefers the profile with that login and host, else uses the login directly.
+func userInRemote(cfg config.Config, remote string) Match {
+	user, host := remoteUser(remote)
+	if user == "" {
+		return Match{}
+	}
+	source := remoteUserSource + user + "@" + host
+	for name, profile := range cfg.Profiles {
+		if profile.User == user && profile.HostOrDefault() == host {
+			return Match{ProfileName: name, Profile: profile, Source: source}
+		}
+	}
+	profile := config.Profile{User: user}
+	if host != config.DefaultHost {
+		profile.Host = host
+	}
+	return Match{ProfileName: user, Profile: profile, Source: source}
 }
 
 func deepestDir(cfg config.Config, current string) Match {

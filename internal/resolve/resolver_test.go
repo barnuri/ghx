@@ -161,3 +161,66 @@ func TestRepoFileBeatsSSHHost(t *testing.T) {
 		t.Fatalf("got %q, want work", got.ProfileName)
 	}
 }
+
+func TestRemoteUserMatchesProfileByLogin(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.RemoteUser = true
+	remote := func(string) string { return "https://me@github.com/org/repo.git" }
+	got := Profile(cfg, filepath.Join(root, "work/api"), "", remote)
+	if got.ProfileName != "personal" || got.Source != remoteUserSource+"me@github.com" {
+		t.Fatalf("unexpected match %+v", got)
+	}
+}
+
+func TestRemoteUserWithoutProfileIsGhUser(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.RemoteUser = true
+	remote := func(string) string { return "https://octocat@ghe.corp/org/repo.git" }
+	got := Profile(cfg, filepath.Join(root, "work/api"), "", remote)
+	if got.Profile.User != "octocat" || got.Profile.HostOrDefault() != "ghe.corp" {
+		t.Fatalf("unexpected match %+v", got)
+	}
+}
+
+func TestRemoteUserHostMismatchSkipsProfile(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.RemoteUser = true
+	remote := func(string) string { return "https://me@ghe.corp/org/repo.git" }
+	got := Profile(cfg, filepath.Join(root, "work/api"), "", remote)
+	if got.ProfileName != "me" || got.Profile.HostOrDefault() != "ghe.corp" {
+		t.Fatalf("unexpected match %+v", got)
+	}
+}
+
+func TestRemoteWithoutUserFallsBackToDirs(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.RemoteUser = true
+	remote := func(string) string { return "https://github.com/org/repo.git" }
+	if got := Profile(cfg, filepath.Join(root, "work/api"), "", remote); got.ProfileName != "work" {
+		t.Fatalf("got %q, want work", got.ProfileName)
+	}
+}
+
+func TestRemoteUserIgnoredWhenDisabled(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.SSHHosts = map[string]string{"gh-personal": "personal"}
+	remote := func(string) string { return "https://me@github.com/org/repo.git" }
+	if got := Profile(cfg, filepath.Join(root, "work/api"), "", remote); got.ProfileName != "work" {
+		t.Fatalf("got %q, want work", got.ProfileName)
+	}
+}
+
+func TestRemoteLookupRunsOnceWithBothKeys(t *testing.T) {
+	root, cfg := newTree(t)
+	cfg.SSHHosts = map[string]string{"gh-personal": "personal"}
+	cfg.RemoteUser = true
+	calls := 0
+	remote := func(string) string {
+		calls++
+		return "https://me@github.com/org/repo.git"
+	}
+	Profile(cfg, filepath.Join(root, "work/api"), "", remote)
+	if calls != 1 {
+		t.Fatalf("remote lookup ran %d times, want 1", calls)
+	}
+}

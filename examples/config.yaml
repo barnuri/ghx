@@ -14,6 +14,7 @@ ssh_hosts:
   gh-work: work
   gh-personal: personal
 
+# remote_user: true
 # default: personal
 # manage_gh: true
 # disable_updates: true

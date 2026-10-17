@@ -35,3 +35,12 @@ func remoteHost(remote string) string {
 	}
 	return hostPart[strings.LastIndex(hostPart, "@")+1:]
 }
+
+// remoteUser returns the user and host of an http(s) remote such as "https://me@github.com/org/repo".
+func remoteUser(remote string) (string, string) {
+	parsed, err := url.Parse(remote)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.User == nil {
+		return "", ""
+	}
+	return parsed.User.Username(), parsed.Hostname()
+}
