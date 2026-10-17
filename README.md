@@ -173,8 +173,13 @@ To make `git push` use the folder's account, point git at the shim:
 
 ```sh
 git config --global credential.https://github.com.helper ''
-git config --global --add credential.https://github.com.helper '!gh auth git-credential'
+git config --global --add credential.https://github.com.helper "!$HOME/.local/bin/ghx auth git-credential"
 ```
+
+Use the full ghx path. VS Code and other apps started from the macOS Dock get a short PATH
+without `~/.local/bin`, so a bare `gh` fails with `gh: command not found`. ghx also checks
+`/opt/homebrew/bin`, `/usr/local/bin` and `/home/linuxbrew/.linuxbrew/bin` for the real gh
+when PATH does not have it.
 
 ## Updates
 

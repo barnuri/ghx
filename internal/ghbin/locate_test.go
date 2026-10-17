@@ -3,6 +3,7 @@ package ghbin
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -31,6 +32,7 @@ func TestLocateSkipsSelf(t *testing.T) {
 	}
 	t.Setenv(ghPathEnv, "")
 	t.Setenv("PATH", shimDir)
+	withFallbackDirs(t, nil)
 	if _, err := Locate(); err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -41,4 +43,28 @@ func TestLocateEnvOverride(t *testing.T) {
 	if got, _ := Locate(); got != "/opt/gh" {
 		t.Fatalf("got %q", got)
 	}
+}
+
+func TestLocateFallsBackWhenPathLacksGh(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no fallback dirs on Windows")
+	}
+	fallback := t.TempDir()
+	expected := filepath.Join(fallback, BinaryName())
+	if err := os.WriteFile(expected, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(ghPathEnv, "")
+	t.Setenv("PATH", t.TempDir())
+	withFallbackDirs(t, []string{fallback})
+	got, err := Locate()
+	if err != nil || got != expected {
+		t.Fatalf("got %q, %v", got, err)
+	}
+}
+
+func withFallbackDirs(t *testing.T, dirs []string) {
+	saved := fallbackDirs
+	fallbackDirs = dirs
+	t.Cleanup(func() { fallbackDirs = saved })
 }
