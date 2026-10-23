@@ -1,8 +1,14 @@
 # ~/.config/ghx/config.yaml  (Windows: %APPDATA%\ghx\config.yaml)
 
+# name: Octo Cat
+# email: octo@personal.example.com
+# git_identity: once
+
 profiles:
   work:
     user: octo-work
+    # email: octo@work.example.com
+    # git_identity: always
   personal:
     user: octo-personal
 

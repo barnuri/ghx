@@ -79,6 +79,9 @@ Full example: [examples/config.yaml](examples/config.yaml).
 |---|---|
 | `profiles.<name>.user` | gh login, as shown by `gh auth status` |
 | `profiles.<name>.host` | GitHub Enterprise host. Default: `github.com` |
+| `profiles.<name>.name` / `.email` | git `user.name` / `user.email` for repos of this profile. See below |
+| `profiles.<name>.git_identity` | `once` or `always`. See below |
+| `name` / `email` / `git_identity` | Fallback for each profile that does not set the key |
 | `dirs` | folder -> profile. The deepest matching folder wins |
 | `ssh_hosts` | ssh host alias in the `origin` remote URL -> profile. See below |
 | `remote_user` | `true` uses the username in an https `origin` remote URL. See below |
@@ -135,6 +138,29 @@ remote_user: true
 
 ghx uses the profile whose `user` and `host` match the URL. If no profile matches, it uses the
 username as the gh login, on the URL's host.
+
+### Git identity: `name` and `email`
+
+ghx can set the repo-local git `user.name` and `user.email` from the matched profile. It is off
+until you set `name` or `email`:
+
+```yaml
+name: My Name                # fallback for every profile
+email: me@example.com
+profiles:
+  work:
+    user: my-work-login
+    email: me@work.com       # name comes from the fallback
+    git_identity: always
+```
+
+Each time ghx runs in a git repo with a matched profile, it applies `git_identity`:
+
+- `once` (default): sets a key only when the repo has no local value for it. A value you set by
+  hand stays.
+- `always`: replaces a local value that is different.
+
+With no matched profile, ghx does not change git config.
 
 ### Resolution order
 

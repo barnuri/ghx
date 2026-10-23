@@ -32,6 +32,8 @@ func TestParseRejectsInvalid(t *testing.T) {
 		"unknown dir profile":      "profiles: {work: {user: a}}\ndirs: {~/x: nope}",
 		"unknown ssh host profile": "profiles: {work: {user: a}}\nssh_hosts: {gh1: nope}",
 		"unknown default profile":  "profiles: {work: {user: a}}\ndefault: nope",
+		"bad profile git_identity": "profiles: {work: {user: a, git_identity: never}}",
+		"bad global git_identity":  "git_identity: never",
 		"bad yaml":                 "profiles: [",
 	}
 	for name, content := range cases {
@@ -40,6 +42,31 @@ func TestParseRejectsInvalid(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestIdentityForFallsBackToTopLevel(t *testing.T) {
+	cfg, err := Parse([]byte(`
+name: Global Name
+email: global@x.com
+git_identity: always
+profiles:
+  work: {user: a, email: work@x.com, git_identity: once}
+  personal: {user: b}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := cfg.IdentityFor(cfg.Profiles["work"])
+	if work != (Identity{Name: "Global Name", Email: "work@x.com", Mode: IdentityOnce}) {
+		t.Fatalf("work: got %+v", work)
+	}
+	personal := cfg.IdentityFor(cfg.Profiles["personal"])
+	if personal != (Identity{Name: "Global Name", Email: "global@x.com", Mode: IdentityAlways}) {
+		t.Fatalf("personal: got %+v", personal)
+	}
+	if got := (Config{}).IdentityFor(Profile{User: "a"}); !got.IsEmpty() || got.Mode != IdentityOnce {
+		t.Fatalf("empty: got %+v", got)
 	}
 }
 

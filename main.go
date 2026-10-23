@@ -6,6 +6,7 @@ import (
 
 	"github.com/barnuri/ghx/internal/config"
 	"github.com/barnuri/ghx/internal/ghbin"
+	"github.com/barnuri/ghx/internal/gitident"
 	"github.com/barnuri/ghx/internal/platform"
 	"github.com/barnuri/ghx/internal/proxy"
 	"github.com/barnuri/ghx/internal/release"
@@ -60,6 +61,7 @@ func run(args []string) error {
 		return err
 	}
 	match := resolve.Profile(cfg, cwd, os.Getenv(profileOverrideEnv), resolve.GitOriginURL)
+	applyGitIdentity(cfg, match, cwd)
 	if len(args) > 0 && args[0] == metaCommand {
 		return runMeta(args[1:], match, ghPath, updater)
 	}
@@ -132,6 +134,16 @@ func scheduleUpdate(cfg config.Config, stateDir string) {
 		return
 	}
 	_ = platform.StartDetached(executable, backgroundUpdateFlag)
+}
+
+// applyGitIdentity only warns on failure, so a git problem never blocks the gh command.
+func applyGitIdentity(cfg config.Config, match resolve.Match, cwd string) {
+	if !match.Found() {
+		return
+	}
+	if err := gitident.Apply(cfg.IdentityFor(match.Profile), cwd); err != nil {
+		fmt.Fprintln(os.Stderr, "ghx: set git identity:", err)
+	}
 }
 
 func buildEnv(args []string, match resolve.Match, ghPath string) ([]string, error) {
