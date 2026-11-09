@@ -3,11 +3,12 @@ package config
 const DefaultHost = "github.com"
 
 type Profile struct {
-	User        string `yaml:"user"`
-	Host        string `yaml:"host"`
-	Name        string `yaml:"name"`
-	Email       string `yaml:"email"`
-	GitIdentity string `yaml:"git_identity"`
+	User               string `yaml:"user"`
+	Host               string `yaml:"host"`
+	Name               string `yaml:"name"`
+	Email              string `yaml:"email"`
+	GitIdentity        string `yaml:"git_identity"`
+	IdentityFromGithub *bool  `yaml:"identity_from_github"`
 }
 
 func (profile Profile) HostOrDefault() string {

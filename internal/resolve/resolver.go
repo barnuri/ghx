@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -16,10 +17,11 @@ const (
 	defaultSource    = "default"
 	sshHostSource    = "ssh host "
 	remoteUserSource = "remote user "
+	orgSource        = "org "
 )
 
 // Profile picks the profile for cwd in this order: GHX_PROFILE, the nearest .ghx file,
-// the ssh host or https user of the origin remote, the deepest configured dir containing cwd, then default.
+// the ssh host, the https user, or the org of the origin remote, the deepest configured dir containing cwd, then default.
 // No match means plain gh.
 func Profile(cfg config.Config, cwd string, override string, remoteURL RemoteURL) Match {
 	if override != "" {
@@ -51,9 +53,9 @@ func named(cfg config.Config, name string, source string) Match {
 	return Match{ProfileName: name, Profile: profile, Source: source}
 }
 
-// fromOrigin runs git only when ssh_hosts or remote_user is configured, so other setups never pay for it.
+// fromOrigin runs git only when ssh_hosts, remote_user or orgs is configured, so other setups never pay for it.
 func fromOrigin(cfg config.Config, current string, remoteURL RemoteURL) Match {
-	if len(cfg.SSHHosts) == 0 && !cfg.RemoteUser {
+	if len(cfg.SSHHosts) == 0 && !cfg.RemoteUser && len(cfg.Orgs) == 0 {
 		return Match{}
 	}
 	remote := remoteURL(current)
@@ -61,9 +63,11 @@ func fromOrigin(cfg config.Config, current string, remoteURL RemoteURL) Match {
 		return match
 	}
 	if cfg.RemoteUser {
-		return userInRemote(cfg, remote)
+		if match := userInRemote(cfg, remote); match.Found() {
+			return match
+		}
 	}
-	return Match{}
+	return orgInRemote(cfg, remote)
 }
 
 func sshHost(cfg config.Config, remote string) Match {
@@ -73,6 +77,42 @@ func sshHost(cfg config.Config, remote string) Match {
 		return Match{}
 	}
 	return named(cfg, profileName, sshHostSource+host)
+}
+
+// orgInRemote matches the remote's org against orgs patterns (case-insensitive). An exact name
+// beats a wildcard, and a longer pattern beats a shorter one.
+func orgInRemote(cfg config.Config, remote string) Match {
+	org := strings.ToLower(remoteOrg(remote))
+	if org == "" {
+		return Match{}
+	}
+	bestPattern, bestProfile := "", ""
+	for pattern, profileName := range cfg.Orgs {
+		lowered := strings.ToLower(pattern)
+		if ok, err := path.Match(lowered, org); err != nil || !ok {
+			continue
+		}
+		if bestPattern == "" || morePrecise(lowered, bestPattern) {
+			bestPattern, bestProfile = lowered, profileName
+		}
+	}
+	if bestPattern == "" {
+		return Match{}
+	}
+	return named(cfg, bestProfile, orgSource+org)
+}
+
+// morePrecise reports whether pattern a is more specific than b: exact before wildcard, then longer, then by name.
+func morePrecise(a string, b string) bool {
+	aExact := !strings.ContainsAny(a, "*?[")
+	bExact := !strings.ContainsAny(b, "*?[")
+	if aExact != bExact {
+		return aExact
+	}
+	if len(a) != len(b) {
+		return len(a) > len(b)
+	}
+	return a < b
 }
 
 // userInRemote prefers the profile with that login and host, else uses the login directly.

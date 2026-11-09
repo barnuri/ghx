@@ -81,9 +81,11 @@ Full example: [examples/config.yaml](examples/config.yaml).
 | `profiles.<name>.host` | GitHub Enterprise host. Default: `github.com` |
 | `profiles.<name>.name` / `.email` | git `user.name` / `user.email` for repos of this profile. See below |
 | `profiles.<name>.git_identity` | `once` or `always`. See below |
-| `name` / `email` / `git_identity` | Fallback for each profile that does not set the key |
+| `profiles.<name>.identity_from_github` | `true` takes a missing name or email from the GitHub account. See below |
+| `name` / `email` / `git_identity` / `identity_from_github` | Fallback for each profile that does not set the key |
 | `dirs` | folder -> profile. The deepest matching folder wins |
 | `ssh_hosts` | ssh host alias in the `origin` remote URL -> profile. See below |
+| `orgs` | GitHub org of the `origin` remote -> profile. `*` and `?` wildcards work, e.g. `"chkp-*": work`. An exact name beats a wildcard |
 | `remote_user` | `true` uses the username in an https `origin` remote URL. See below |
 | `default` | profile for folders outside every `dirs` entry. Default: plain gh |
 | `manage_gh` | `true` makes ghx download gh and keep it updated. Default: use gh from `PATH` |
@@ -162,15 +164,27 @@ Each time ghx runs in a git repo with a matched profile, it applies `git_identit
 
 With no matched profile, ghx does not change git config.
 
+Set `identity_from_github: true` to take a name or email that neither the profile nor the
+fallback sets from the profile's GitHub account. The name is the account's display name. The
+email is the first of:
+
+1. The primary email. This needs the `user` token scope: `gh auth refresh -s user --user <login>`.
+2. The public profile email.
+3. On github.com, the noreply email `<id>+<login>@users.noreply.github.com`.
+
+ghx calls GitHub only when it is about to write a key, and caches the result for each login for
+one day.
+
 ### Resolution order
 
 1. `GHX_PROFILE` environment variable
 2. Nearest `.ghx` file
 3. `ssh_hosts` entry for the `origin` remote's host
 4. Username in the `origin` remote URL, when `remote_user` is `true`
-5. Deepest matching `dirs` entry
-6. `default`
-7. No match: plain gh, with your active gh account
+5. Org of the `origin` remote, when `orgs` matches it
+6. Deepest matching `dirs` entry
+7. `default`
+8. No match: plain gh, with your active gh account
 
 ## Commands
 

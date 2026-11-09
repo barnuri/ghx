@@ -65,8 +65,26 @@ profiles:
 	if personal != (Identity{Name: "Global Name", Email: "global@x.com", Mode: IdentityAlways}) {
 		t.Fatalf("personal: got %+v", personal)
 	}
-	if got := (Config{}).IdentityFor(Profile{User: "a"}); !got.IsEmpty() || got.Mode != IdentityOnce {
+	if got := (Config{}).IdentityFor(Profile{User: "a"}); got.Enabled() || got.Mode != IdentityOnce {
 		t.Fatalf("empty: got %+v", got)
+	}
+}
+
+func TestIdentityFromGithubProfileOverridesTopLevel(t *testing.T) {
+	cfg, err := Parse([]byte(`
+identity_from_github: true
+profiles:
+  work: {user: a, identity_from_github: false}
+  personal: {user: b}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.IdentityFor(cfg.Profiles["work"]).Enabled() {
+		t.Fatal("work: profile false must override top-level true")
+	}
+	if !cfg.IdentityFor(cfg.Profiles["personal"]).FromGithub {
+		t.Fatal("personal: must inherit top-level true")
 	}
 }
 

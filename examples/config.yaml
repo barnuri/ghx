@@ -3,6 +3,7 @@
 # name: Octo Cat
 # email: octo@personal.example.com
 # git_identity: once
+# identity_from_github: true
 
 profiles:
   work:

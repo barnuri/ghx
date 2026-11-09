@@ -4,21 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
-	ManageGh       bool               `yaml:"manage_gh"`
-	DisableUpdates bool               `yaml:"disable_updates"`
-	Default        string             `yaml:"default"`
-	Profiles       map[string]Profile `yaml:"profiles"`
-	Dirs           map[string]string  `yaml:"dirs"`
-	SSHHosts       map[string]string  `yaml:"ssh_hosts"`
-	RemoteUser     bool               `yaml:"remote_user"`
-	Name           string             `yaml:"name"`
-	Email          string             `yaml:"email"`
-	GitIdentity    string             `yaml:"git_identity"`
+	ManageGh           bool               `yaml:"manage_gh"`
+	DisableUpdates     bool               `yaml:"disable_updates"`
+	Default            string             `yaml:"default"`
+	Profiles           map[string]Profile `yaml:"profiles"`
+	Dirs               map[string]string  `yaml:"dirs"`
+	SSHHosts           map[string]string  `yaml:"ssh_hosts"`
+	Orgs               map[string]string  `yaml:"orgs"`
+	RemoteUser         bool               `yaml:"remote_user"`
+	Name               string             `yaml:"name"`
+	Email              string             `yaml:"email"`
+	GitIdentity        string             `yaml:"git_identity"`
+	IdentityFromGithub bool               `yaml:"identity_from_github"`
 }
 
 // Load returns an empty Config when the file does not exist, so ghx acts as plain gh.
@@ -64,6 +67,14 @@ func (cfg Config) validate() error {
 	for host, profileName := range cfg.SSHHosts {
 		if _, ok := cfg.Profiles[profileName]; !ok {
 			return fmt.Errorf("ssh host %q: unknown profile %q", host, profileName)
+		}
+	}
+	for org, profileName := range cfg.Orgs {
+		if _, err := path.Match(org, ""); err != nil {
+			return fmt.Errorf("org %q: invalid pattern: %w", org, err)
+		}
+		if _, ok := cfg.Profiles[profileName]; !ok {
+			return fmt.Errorf("org %q: unknown profile %q", org, profileName)
 		}
 	}
 	if _, ok := cfg.Profiles[cfg.Default]; cfg.Default != "" && !ok {

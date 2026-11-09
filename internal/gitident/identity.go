@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/barnuri/ghx/internal/config"
 )
@@ -15,30 +16,50 @@ const (
 	unsetExitCode = 1
 )
 
+// Lookup returns the GitHub name and email used for keys the config leaves empty.
+type Lookup func() (config.Identity, error)
+
 // Apply writes identity to the repo-local git config of dir. Mode "once" fills only unset keys,
 // "always" also replaces a different value. Outside a git repo it does nothing.
-func Apply(identity config.Identity, dir string) error {
-	if identity.IsEmpty() || !insideRepo(dir) {
+func Apply(identity config.Identity, dir string, lookup Lookup) error {
+	if !identity.Enabled() || !insideRepo(dir) {
 		return nil
 	}
-	if err := applyKey(dir, nameKey, identity.Name, identity.Mode); err != nil {
+	fromGithub := sync.OnceValues(lookup)
+	valueOf := func(explicit string, pick func(config.Identity) string) func() (string, error) {
+		return func() (string, error) {
+			if explicit != "" || !identity.FromGithub {
+				return explicit, nil
+			}
+			fetched, err := fromGithub()
+			return pick(fetched), err
+		}
+	}
+	nameValue := valueOf(identity.Name, func(fetched config.Identity) string { return fetched.Name })
+	if err := applyKey(dir, nameKey, identity.Mode, nameValue); err != nil {
 		return err
 	}
-	return applyKey(dir, emailKey, identity.Email, identity.Mode)
+	emailValue := valueOf(identity.Email, func(fetched config.Identity) string { return fetched.Email })
+	return applyKey(dir, emailKey, identity.Mode, emailValue)
 }
 
-func applyKey(dir string, key string, value string, mode string) error {
-	if value == "" {
-		return nil
-	}
+// applyKey reads the wanted value only when it may be written, so a GitHub lookup runs only then.
+func applyKey(dir string, key string, mode string, wantedValue func() (string, error)) error {
 	current, isSet, err := localValue(dir, key)
 	if err != nil {
 		return err
 	}
-	if isSet && (mode == config.IdentityOnce || current == value) {
+	if isSet && mode == config.IdentityOnce {
 		return nil
 	}
-	if output, err := exec.Command("git", "-C", dir, "config", "--local", key, value).CombinedOutput(); err != nil {
+	wanted, err := wantedValue()
+	if err != nil {
+		return err
+	}
+	if wanted == "" || (isSet && current == wanted) {
+		return nil
+	}
+	if output, err := exec.Command("git", "-C", dir, "config", "--local", key, wanted).CombinedOutput(); err != nil {
 		return fmt.Errorf("set git %s: %w: %s", key, err, strings.TrimSpace(string(output)))
 	}
 	return nil

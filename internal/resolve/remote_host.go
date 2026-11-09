@@ -36,6 +36,30 @@ func remoteHost(remote string) string {
 	return hostPart[strings.LastIndex(hostPart, "@")+1:]
 }
 
+// remoteOrg returns the first path segment of a remote, the GitHub org or user: "org" in
+// "https://github.com/org/repo.git", "git@host:org/repo" or "ssh://git@host/org/repo".
+func remoteOrg(remote string) string {
+	var repoPath string
+	if strings.Contains(remote, "://") {
+		parsed, err := url.Parse(remote)
+		if err != nil {
+			return ""
+		}
+		repoPath = parsed.Path
+	} else {
+		hostPart, rest, found := strings.Cut(remote, ":")
+		if !found || strings.ContainsAny(hostPart, `/\`) {
+			return ""
+		}
+		repoPath = rest
+	}
+	org, _, found := strings.Cut(strings.TrimPrefix(repoPath, "/"), "/")
+	if !found {
+		return ""
+	}
+	return org
+}
+
 // remoteUser returns the user and host of an http(s) remote such as "https://me@github.com/org/repo".
 func remoteUser(remote string) (string, string) {
 	parsed, err := url.Parse(remote)

@@ -1,6 +1,7 @@
 package gitident
 
 import (
+	"errors"
 	"os/exec"
 	"strings"
 	"testing"
@@ -57,7 +58,7 @@ func TestApply(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := newRepo(t, tc.existing)
-			if err := Apply(tc.identity, dir); err != nil {
+			if err := Apply(tc.identity, dir, failLookup(t)); err != nil {
 				t.Fatal(err)
 			}
 			if got := localOrEmpty(dir, nameKey); got != tc.wantName {
@@ -76,7 +77,65 @@ func TestApplyOutsideRepoDoesNothing(t *testing.T) {
 	}
 	t.Setenv("GIT_CEILING_DIRECTORIES", t.TempDir())
 	dir := t.TempDir()
-	if err := Apply(config.Identity{Name: "Me", Mode: config.IdentityAlways}, dir); err != nil {
+	if err := Apply(config.Identity{Name: "Me", Mode: config.IdentityAlways}, dir, failLookup(t)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func failLookup(t *testing.T) Lookup {
+	return func() (config.Identity, error) {
+		t.Fatal("unexpected GitHub lookup")
+		return config.Identity{}, nil
+	}
+}
+
+func TestApplyFromGithub(t *testing.T) {
+	fetched := config.Identity{Name: "Gh Name", Email: "gh@x.com"}
+	cases := []struct {
+		name      string
+		existing  map[string]string
+		identity  config.Identity
+		wantCalls int
+		wantName  string
+		wantEmail string
+	}{
+		{"fills both unset keys with one lookup", nil,
+			config.Identity{Mode: config.IdentityOnce, FromGithub: true}, 1, "Gh Name", "gh@x.com"},
+		{"explicit value wins over GitHub", nil,
+			config.Identity{Email: "me@x.com", Mode: config.IdentityOnce, FromGithub: true}, 1, "Gh Name", "me@x.com"},
+		{"once skips lookup when keys are set", map[string]string{nameKey: "Old", emailKey: "old@x.com"},
+			config.Identity{Mode: config.IdentityOnce, FromGithub: true}, 0, "Old", "old@x.com"},
+		{"always replaces with GitHub values", map[string]string{nameKey: "Old", emailKey: "old@x.com"},
+			config.Identity{Mode: config.IdentityAlways, FromGithub: true}, 1, "Gh Name", "gh@x.com"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newRepo(t, tc.existing)
+			calls := 0
+			lookup := func() (config.Identity, error) {
+				calls++
+				return fetched, nil
+			}
+			if err := Apply(tc.identity, dir, lookup); err != nil {
+				t.Fatal(err)
+			}
+			if calls != tc.wantCalls {
+				t.Fatalf("lookup calls: got %d, want %d", calls, tc.wantCalls)
+			}
+			if got := localOrEmpty(dir, nameKey); got != tc.wantName {
+				t.Fatalf("name: got %q, want %q", got, tc.wantName)
+			}
+			if got := localOrEmpty(dir, emailKey); got != tc.wantEmail {
+				t.Fatalf("email: got %q, want %q", got, tc.wantEmail)
+			}
+		})
+	}
+}
+
+func TestApplyReturnsLookupError(t *testing.T) {
+	dir := newRepo(t, nil)
+	lookup := func() (config.Identity, error) { return config.Identity{}, errors.New("no token") }
+	if err := Apply(config.Identity{Mode: config.IdentityOnce, FromGithub: true}, dir, lookup); err == nil {
+		t.Fatal("expected error")
 	}
 }
